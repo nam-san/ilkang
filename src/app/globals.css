@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #f1f5f9;
+  --surface: #ffffff;
+  --border: #e2e8f0;
+  --text: #0f172a;
+  --muted: #64748b;
+  --brand: #1d4ed8;
+  --brand-dark: #1e3a8a;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  color: var(--text);
+  background: var(--bg);
+  font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Malgun Gothic",
+    "맑은 고딕", "Apple SD Gothic Neo", "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* --- 공통 컴포넌트 유틸 --- */
+@layer components {
+  .card {
+    @apply bg-white border border-slate-200 rounded-xl shadow-sm;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    @apply btn bg-blue-700 text-white hover:bg-blue-800;
+  }
+  .btn-ghost {
+    @apply btn bg-slate-100 text-slate-700 hover:bg-slate-200;
+  }
+  .btn-danger {
+    @apply btn bg-red-50 text-red-600 hover:bg-red-100;
+  }
+  .input {
+    @apply w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400;
+  }
+  .label {
+    @apply block text-xs font-semibold text-slate-500 mb-1;
+  }
+  .th {
+    @apply px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide border-b border-slate-200 bg-slate-50;
+  }
+  .td {
+    @apply px-3 py-2.5 text-sm text-slate-700 border-b border-slate-100;
+  }
+}
+
+/* FullCalendar 톤 맞춤 */
+.fc {
+  --fc-border-color: #e2e8f0;
+  --fc-today-bg-color: #eff6ff;
+  font-size: 13px;
+}
+.fc .fc-toolbar-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.fc .fc-button {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  text-transform: none;
+  font-weight: 600;
+}
+.fc .fc-button:hover {
+  background: #1e40af;
+  border-color: #1e40af;
+}
+.fc .fc-button-primary:disabled {
+  background: #93c5fd;
+  border-color: #93c5fd;
+}
+.fc-event {
+  cursor: pointer;
+  font-weight: 600;
+}

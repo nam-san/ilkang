@@ -1,0 +1,241 @@
+// (주)일강이앤지 통합 창호 공사 관리 시스템 - DB 스키마
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+//  창호 견적 산출 (알루미늄 창호공사 견적 계산 시스템)
+// ============================================================
+
+/// 공사(견적 프로젝트) - 기준값/비용파라미터 스냅샷 단위
+model EstimateProject {
+  id          Int              @id @default(autoincrement())
+  siteName    String // 현장명
+  workType    String? // 공종
+  builderName String? // 건설사 (입찰 연동 시)
+  bidId       Int?             @unique // 연동된 입찰
+  createdAt   DateTime         @default(now())
+  bid         Bid?             @relation(fields: [bidId], references: [id], onDelete: SetNull)
+  windowTypes WindowType[]
+  costParam   CostParam?
+  lines       EstimateLine[]
+}
+
+/// 창호유형 (프로젝트별) - 예: 갤러리창, T5 미서기창, FIX+PJ창
+model WindowType {
+  id         Int               @id @default(autoincrement())
+  projectId  Int
+  name       String
+  sortOrder  Int               @default(0)
+  active     Boolean           @default(true)
+  project    EstimateProject   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  components WindowComponent[]
+  lines      EstimateLine[]
+}
+
+/// 창호유형별 부재 - 단위중량(핵심 기준값), 치수 구성(폭·개수/높이·개수)
+model WindowComponent {
+  id             Int             @id @default(autoincrement())
+  windowTypeId   Int
+  name           String // 후레임 / 상살,하살 / 손잡이,고리개 / 고정창 / PJ창 ...
+  unitWeight     Float           @default(0) // 단위중량 kg/M
+  defaultCountW  Int             @default(0) // 기본 폭 개수
+  defaultCountH  Int             @default(0) // 기본 높이 개수
+  sortOrder      Int             @default(0)
+  windowType     WindowType      @relation(fields: [windowTypeId], references: [id], onDelete: Cascade)
+  lineComponents LineComponent[]
+}
+
+/// 비용 파라미터 (프로젝트당 1개)
+model CostParam {
+  id            Int             @id @default(autoincrement())
+  projectId     Int             @unique
+  barPrices     String          @default("{}") // 바 종류별 kg당 자재비 JSON {"단열바":9520,"일반바":9300}
+  wagePerKg     Float           @default(0) // kg당 시공비
+  hingeCost     Float           @default(0) // 흰지비
+  screenCost    Float           @default(0) // 롤방충망비
+  pjInstallCost Float           @default(0) // PJ 시공비
+  project       EstimateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+/// 견적 라인 (엑셀 A~N + 파싱결과 + 계산결과)
+model EstimateLine {
+  id               Int             @id @default(autoincrement())
+  projectId        Int
+  code             String?
+  itemName         String // 품명 (계층 포함)
+  isGroup          Boolean         @default(false) // 소계/그룹 행 여부
+  spec             String? // 규격 원문
+  unit             String?
+  quantity         Float           @default(0)
+  matUnitPrice     Float           @default(0) // 재료비 단가
+  laborUnitPrice   Float           @default(0) // 노무비 단가
+  expenseUnitPrice Float           @default(0) // 경비 단가
+  windowTypeId     Int?
+  widthMm          Int? // 파싱된 W
+  heightMm         Int? // 파싱된 H
+  parseWarning     Boolean         @default(false) // 규격 파싱 실패
+  note             String?
+  sortOrder        Int             @default(0)
+  totalWeight      Float? // 계산된 총중량 O
+  drawingUrl       String? // 도면(사진) 경로
+  // ── 비용 계산(Phase 2) ──
+  barType          String? // 자재비 단가 적용 바 종류 (CostParam.barPrices 키)
+  hingeCost        Float           @default(0) // 흰지비 (라인)
+  screenCost       Float           @default(0) // 방충망비 (라인)
+  pjInstallCost    Float           @default(0) // PJ 시공비 (라인)
+  matTotalCost     Float? // 총자재비 (자동계산)
+  installCostCalc  Float? // 시공비 (자동계산)
+  laborTotalCost   Float? // 총시공비 (자동계산)
+  matOverride      Boolean         @default(false) // 재료비단가 수동조정 여부
+  laborOverride    Boolean         @default(false) // 노무비단가 수동조정 여부
+  project          EstimateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  windowType       WindowType?     @relation(fields: [windowTypeId], references: [id])
+  components       LineComponent[]
+}
+
+/// 라인×부재 물량 (자동채움 + 수동조정)
+model LineComponent {
+  id                Int             @id @default(autoincrement())
+  estimateLineId    Int
+  windowComponentId Int
+  compName          String // 부재명 스냅샷
+  unitWeight        Float           @default(0) // 단위중량 스냅샷
+  widthMm           Int             @default(0)
+  countW            Int             @default(0)
+  heightMm          Int             @default(0)
+  countH            Int             @default(0)
+  lengthM           Float           @default(0) // 계산된 길이
+  weightKg          Float           @default(0) // 계산된 중량
+  sortOrder         Int             @default(0)
+  estimateLine      EstimateLine    @relation(fields: [estimateLineId], references: [id], onDelete: Cascade)
+  windowComponent   WindowComponent @relation(fields: [windowComponentId], references: [id], onDelete: Cascade)
+}
+
+/// 수주내역 (Contracts)
+model Contract {
+  id             Int               @id @default(autoincrement())
+  siteName       String // 현장명 (공사명)
+  startDate      DateTime? // 착공 날짜
+  endDate        DateTime? // 준공 날짜
+  builderName    String // 건설사 (발주처)
+  contractAmount Float             @default(0) // 도급액 (원)
+  manager        String? // 자사 담당자
+  warrantyPeriod String? // 하자보수기간
+  createdAt      DateTime          @default(now())
+  assignments    DailyAssignment[]
+  logs           DailyLog[]
+}
+
+/// 인력/팀 (Workers)
+model Worker {
+  id          Int               @id @default(autoincrement())
+  name        String // 팀원 이름
+  teamName    String // 소속 팀 (예: 시공1팀, 양중팀)
+  dailyWage   Float             @default(0) // 기본 인건비 단가 (일당)
+  active      Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  assignments DailyAssignment[]
+}
+
+/// 일자별 투입 현황 (DailyAssignments)
+model DailyAssignment {
+  id         Int      @id @default(autoincrement())
+  contractId Int // 현장 (site)
+  date       DateTime // 투입 날짜
+  workerId   Int
+  actualWage Float    @default(0) // 당일 확정 단가
+  teamName   String? // 투입 당시 팀명 스냅샷
+  createdAt  DateTime @default(now())
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  worker     Worker   @relation(fields: [workerId], references: [id], onDelete: Cascade)
+}
+
+/// 근무일지 사진 (DailyLogs)
+model DailyLog {
+  id         Int      @id @default(autoincrement())
+  contractId Int
+  date       DateTime
+  category   String   @default("근무일지") // 근무일지(필수) / 작업사진 / 기타
+  imageUrl   String // 업로드된 이미지 경로
+  note       String? // 특이사항 메모
+  createdAt  DateTime @default(now())
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+}
+
+/// 입찰 (Bid) - 견적을 등록할 대상
+model Bid {
+  id              Int              @id @default(autoincrement())
+  builderName     String // 건설사명
+  siteName        String // 현장명
+  startDate       DateTime? // 착공
+  endDate         DateTime? // 준공
+  dueDate         DateTime? // (입찰) 예정일
+  createdAt       DateTime         @default(now())
+  items           EstimateItem[]
+  estimateProject EstimateProject? // 연동된 창호 견적산출 공사
+}
+
+/// 견적 항목 (입찰별 견적 상세) - 수동 등록 또는 엑셀 파싱
+model EstimateItem {
+  id        Int      @id @default(autoincrement())
+  bidId     Int // 소속 입찰
+  itemName  String // 품명
+  spec      String? // 상세정보 (규격/사양)
+  quantity  Float    @default(0) // 수량
+  unit      String? // 단위
+  unitPrice Float? // 단가
+  createdAt DateTime @default(now())
+  bid       Bid      @relation(fields: [bidId], references: [id], onDelete: Cascade)
+}
+
+/// 하도급 업체 정보 (Subcontractor Company)
+model SubcontractorCompany {
+  id        Int      @id @default(autoincrement())
+  name      String // 업체명
+  bizNumber String? // 사업자등록번호
+  ceo       String? // 대표자
+  phone     String? // 연락처
+  email     String? // 이메일
+  category  String? // 전문분야(공종) 예: 창호/유리/실링
+  address   String? // 주소
+  note      String? // 비고
+  createdAt DateTime @default(now())
+}
+
+/// 하도급 견적 (SubcontractorEstimates)
+model SubcontractorEstimate {
+  id          Int      @id @default(autoincrement())
+  date        DateTime // 날짜
+  companyName String // 업체명 (하청업체)
+  itemName    String // 품명
+  quantity    Float    @default(0) // 수량
+  unitPrice   Float    @default(0) // 단가
+  note        String?
+  createdAt   DateTime @default(now())
+}
+
+/// 전사 TO-DO LIST (캘린더 연동)
+model Todo {
+  id          Int       @id @default(autoincrement())
+  content     String // 업무 내용
+  assignee    String? // 담당자
+  dueDate     DateTime? // 캘린더 지정일 (있으면 달력에 표시)
+  done        Boolean   @default(false)
+  completedBy String? // 조치 완료자
+  completedAt DateTime? // 완료 일시
+  createdAt   DateTime  @default(now())
+}
+
+/// 공용 메모장 (단일 공유 보드)
+model Memo {
+  id        Int      @id @default(autoincrement())
+  content   String   @default("")
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+}

@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+.gitignore
+*.db
+*.db-journal
+prisma/*.db
+public/uploads/*
+!public/uploads/.gitkeep
+.env
+.env*.local
+data
+*.tsbuildinfo
+npm-debug.log*
