@@ -33,14 +33,16 @@ export default function AssignTab({
   workers,
   teams,
   preSite,
+  preDate,
 }: {
   contracts: Contract[];
   workers: Worker[];
   teams: string[];
   preSite: string | null;
+  preDate?: string | null;
 }) {
   const [siteId, setSiteId] = useState<string>(preSite || "");
-  const [date, setDate] = useState(today);
+  const [date, setDate] = useState(preDate || today);
   const [rows, setRows] = useState<Assignment[]>([]);
   const [team, setTeam] = useState("");
   const [workerId, setWorkerId] = useState("");
@@ -53,6 +55,14 @@ export default function AssignTab({
   useEffect(() => {
     if (!siteId && contracts.length && !preSite) setSiteId(String(contracts[0].id));
   }, [contracts, siteId, preSite]);
+
+  // 투입 캘린더에서 이동해 온 경우 현장·날짜 반영
+  useEffect(() => {
+    if (preSite) setSiteId(preSite);
+  }, [preSite]);
+  useEffect(() => {
+    if (preDate) setDate(preDate);
+  }, [preDate]);
 
   const loadRows = useCallback(async () => {
     if (!siteId || !date) return;

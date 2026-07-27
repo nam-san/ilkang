@@ -3,8 +3,11 @@ FROM node:22-slim
 
 WORKDIR /app
 
-# Prisma 실행에 필요한 openssl
-RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+# Prisma 실행에 필요한 openssl + 한국 시간대 적용용 tzdata
+RUN apt-get update -y && apt-get install -y openssl tzdata && rm -rf /var/lib/apt/lists/*
+
+# 서버 시간대를 한국으로 (날짜 계산이 사용자 기준과 일치하도록)
+ENV TZ=Asia/Seoul
 
 # 의존성 설치 (devDependencies 포함 — 빌드/prisma CLI 필요)
 COPY package*.json ./
@@ -20,5 +23,6 @@ RUN npx prisma generate && npm run build
 ENV NODE_ENV=production
 EXPOSE 3000
 
-# 시작 시 스키마 동기화(볼륨의 DB 생성/갱신) 후 서버 기동
-CMD ["sh", "-c", "npx prisma db push --skip-generate && npx next start -H 0.0.0.0 -p ${PORT:-3000}"]
+# 시작 순서: ① 데이터 승계 마이그레이션 → ② 스키마 동기화 → ③ 서버 기동
+# (①이 실패하면 배포가 중단되어 기존 버전이 계속 서비스됨 = 데이터 보호)
+CMD ["sh", "-c", "node prisma/predeploy.mjs && npx prisma db push --skip-generate --accept-data-loss && npx next start -H 0.0.0.0 -p ${PORT:-3000}"]

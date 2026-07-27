@@ -2,13 +2,14 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { Plus, Trash2, CheckCircle2, Circle, CalendarDays } from "lucide-react";
-import { ymd, ymdhm } from "@/lib/format";
+import { ymd, ymdhm, todayYmd } from "@/lib/format";
 
 type Todo = {
   id: number;
   content: string;
   assignee: string | null;
-  dueDate: string | null;
+  startDate: string | null;
+  endDate: string | null;
   done: boolean;
   completedBy: string | null;
   completedAt: string | null;
@@ -18,7 +19,8 @@ export default function TodoList() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [content, setContent] = useState("");
   const [assignee, setAssignee] = useState("");
-  const [dueDate, setDueDate] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   const load = useCallback(async () => {
     const res = await fetch("/api/todos", { cache: "no-store" });
@@ -36,11 +38,17 @@ export default function TodoList() {
     await fetch("/api/todos", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content, assignee, dueDate: dueDate || null }),
+      body: JSON.stringify({
+        content,
+        assignee,
+        startDate: startDate || null,
+        endDate: endDate || null,
+      }),
     });
     setContent("");
     setAssignee("");
-    setDueDate("");
+    setStartDate("");
+    setEndDate("");
     load();
   };
 
@@ -64,14 +72,19 @@ export default function TodoList() {
     load();
   };
 
-  // 노출 규칙: ①날짜 없는 일반 업무는 항상 ②당일 업무 ③기한 지난 미완료 업무
-  //           (미래 업무·기한 지난 완료 업무는 캘린더에서만 확인)
-  const todayStr = ymd(new Date());
+  // 노출 규칙: ①날짜 없는 업무는 항상 ②오늘이 기간에 포함된 업무 ③기간 지난 미완료 업무
+  //           (미래 업무·기간 지난 완료 업무는 캘린더에서만 확인)
+  const todayStr = todayYmd();
+  const rangeOf = (t: Todo) => {
+    const s = t.startDate ? ymd(t.startDate) : null;
+    const e = t.endDate ? ymd(t.endDate) : s;
+    return { s, e };
+  };
   const visibleTodos = todos.filter((t) => {
-    if (!t.dueDate) return true;
-    const d = ymd(t.dueDate);
-    if (d === todayStr) return true;
-    return d < todayStr && !t.done;
+    const { s, e } = rangeOf(t);
+    if (!s) return true;
+    if (s <= todayStr && todayStr <= (e ?? s)) return true; // 진행 기간 중
+    return (e ?? s) < todayStr && !t.done; // 기한 지난 미완료
   });
   const activeCount = visibleTodos.filter((t) => !t.done).length;
 
@@ -94,6 +107,28 @@ export default function TodoList() {
           onChange={(e) => setContent(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && add()}
         />
+        {/* 기간 지정 (캘린더 자동 연동) */}
+        <div className="flex items-center gap-1">
+          <input
+            type="date"
+            className="input flex-1 text-xs"
+            title="시작일"
+            value={startDate}
+            onChange={(e) => {
+              setStartDate(e.target.value);
+              if (endDate && e.target.value && endDate < e.target.value) setEndDate(e.target.value);
+            }}
+          />
+          <span className="text-slate-400 text-xs shrink-0">~</span>
+          <input
+            type="date"
+            className="input flex-1 text-xs"
+            title="종료일(미지정 시 당일)"
+            min={startDate || undefined}
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+          />
+        </div>
         <div className="flex gap-2">
           <input
             className="input flex-1"
@@ -101,13 +136,6 @@ export default function TodoList() {
             value={assignee}
             onChange={(e) => setAssignee(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && add()}
-          />
-          <input
-            type="date"
-            className="input w-36 shrink-0"
-            title="캘린더 지정일(옵션)"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
           />
           <button className="btn-primary shrink-0" onClick={add}>
             <Plus className="w-4 h-4" /> 등록
@@ -122,51 +150,53 @@ export default function TodoList() {
           </li>
         )}
         {visibleTodos.map((t) => {
-          const overdue = !!t.dueDate && !t.done && ymd(t.dueDate) < todayStr;
+          const { s, e } = rangeOf(t);
+          const overdue = !!s && !t.done && (e ?? s) < todayStr;
+          const label = s ? (e && e !== s ? `${s} ~ ${e}` : s) : null;
           return (
-          <li key={t.id} className="flex items-start gap-2 px-3 py-2.5 group">
-            <button onClick={() => toggle(t)} className="mt-0.5 shrink-0">
-              {t.done ? (
-                <CheckCircle2 className="w-5 h-5 text-green-600" />
-              ) : (
-                <Circle className="w-5 h-5 text-slate-300 hover:text-blue-500" />
-              )}
-            </button>
-            <div className="flex-1 min-w-0">
-              <p
-                className={`text-sm break-words ${
-                  t.done ? "line-through text-slate-400" : "text-slate-800"
-                }`}
-              >
-                {t.content}
-              </p>
-              <div className="text-[11px] text-slate-400 mt-0.5 flex flex-wrap items-center gap-x-2">
-                {t.dueDate && (
-                  <span
-                    className={`inline-flex items-center gap-0.5 font-semibold ${
-                      overdue ? "text-red-600" : "text-amber-600"
-                    }`}
-                  >
-                    <CalendarDays className="w-3 h-3" />
-                    {ymd(t.dueDate)}
-                    {overdue && " (지연)"}
-                  </span>
+            <li key={t.id} className="flex items-start gap-2 px-3 py-2.5 group">
+              <button onClick={() => toggle(t)} className="mt-0.5 shrink-0">
+                {t.done ? (
+                  <CheckCircle2 className="w-5 h-5 text-green-600" />
+                ) : (
+                  <Circle className="w-5 h-5 text-slate-300 hover:text-blue-500" />
                 )}
-                {t.assignee && <span>담당: {t.assignee}</span>}
-                {t.done && t.completedAt && (
-                  <span className="text-green-600">
-                    ✓ {t.completedBy} · {ymdhm(t.completedAt)}
-                  </span>
-                )}
+              </button>
+              <div className="flex-1 min-w-0">
+                <p
+                  className={`text-sm break-words ${
+                    t.done ? "line-through text-slate-400" : "text-slate-800"
+                  }`}
+                >
+                  {t.content}
+                </p>
+                <div className="text-[11px] text-slate-400 mt-0.5 flex flex-wrap items-center gap-x-2">
+                  {label && (
+                    <span
+                      className={`inline-flex items-center gap-0.5 font-semibold ${
+                        overdue ? "text-red-600" : "text-amber-600"
+                      }`}
+                    >
+                      <CalendarDays className="w-3 h-3" />
+                      {label}
+                      {overdue && " (지연)"}
+                    </span>
+                  )}
+                  {t.assignee && <span>담당: {t.assignee}</span>}
+                  {t.done && t.completedAt && (
+                    <span className="text-green-600">
+                      ✓ {t.completedBy} · {ymdhm(t.completedAt)}
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
-            <button
-              onClick={() => remove(t.id)}
-              className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 shrink-0"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </li>
+              <button
+                onClick={() => remove(t.id)}
+                className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 shrink-0"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </li>
           );
         })}
       </ul>

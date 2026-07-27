@@ -225,16 +225,18 @@ model Todo {
   id          Int       @id @default(autoincrement())
   content     String // 업무 내용
   assignee    String? // 담당자
-  dueDate     DateTime? // 캘린더 지정일 (있으면 달력에 표시)
+  startDate   DateTime? // 업무 시작일 (있으면 캘린더 표시)
+  endDate     DateTime? // 업무 종료일 (미지정 시 시작일 당일)
   done        Boolean   @default(false)
   completedBy String? // 조치 완료자
   completedAt DateTime? // 완료 일시
   createdAt   DateTime  @default(now())
 }
 
-/// 공용 메모장 (단일 공유 보드)
+/// 공용 메모장 (날짜별 공유 보드 - 캘린더 연동)
 model Memo {
   id        Int      @id @default(autoincrement())
+  date      DateTime @unique // 메모 작성 일자 (하루 1개)
   content   String   @default("")
   updatedBy String?
   updatedAt DateTime @updatedAt

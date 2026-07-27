@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { dayStart } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -19,8 +20,10 @@ export async function PATCH(
   }
   if (typeof body.content === "string") data.content = body.content.trim();
   if (typeof body.assignee === "string") data.assignee = body.assignee.trim() || null;
-  if ("dueDate" in body)
-    data.dueDate = body.dueDate ? new Date(`${body.dueDate}T00:00:00`) : null;
+  // 기간(시작일/종료일) 변경 — 캘린더 드래그 이동/리사이즈 포함
+  if ("startDate" in body || "dueDate" in body)
+    data.startDate = dayStart(body.startDate ?? body.dueDate);
+  if ("endDate" in body) data.endDate = dayStart(body.endDate);
 
   const todo = await prisma.todo.update({ where: { id }, data });
   return NextResponse.json(todo);
