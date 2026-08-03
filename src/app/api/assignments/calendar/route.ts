@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { ymd } from "@/lib/format";
+import { payableWage, manDay } from "@/lib/labor";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,7 @@ export async function GET(req: NextRequest) {
       siteName: string;
       teamName: string;
       count: number;
+      manDays: number;
       totalWage: number;
       workers: string[];
     }
@@ -53,12 +55,14 @@ export async function GET(req: NextRequest) {
         siteName: r.contract.siteName,
         teamName,
         count: 0,
+        manDays: 0,
         totalWage: 0,
         workers: [],
       };
     cur.count += 1;
-    cur.totalWage += r.actualWage;
-    cur.workers.push(r.worker.name);
+    cur.manDays += manDay(r.halfDay);
+    cur.totalWage += payableWage(r.actualWage, r.halfDay);
+    cur.workers.push(`${r.worker.name}${r.halfDay ? "(반)" : ""}`);
     map.set(key, cur);
   }
 

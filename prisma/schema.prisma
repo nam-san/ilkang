@@ -149,7 +149,8 @@ model DailyAssignment {
   contractId Int // 현장 (site)
   date       DateTime // 투입 날짜
   workerId   Int
-  actualWage Float    @default(0) // 당일 확정 단가
+  actualWage Float    @default(0) // 당일 확정 단가 (종일 기준)
+  halfDay    Boolean  @default(false) // 반일 근무 → 인건비 0.5배
   teamName   String? // 투입 당시 팀명 스냅샷
   createdAt  DateTime @default(now())
   contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
