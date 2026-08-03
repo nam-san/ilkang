@@ -156,21 +156,15 @@ async function main() {
     ],
   });
 
-  // 날짜별 공용 메모 (캘린더에서 그날 메모 복귀 데모)
-  const todayMemo = new Date();
-  todayMemo.setHours(0, 0, 0, 0);
-  await prisma.memo.createMany({
-    data: [
-      {
-        date: todayMemo,
-        content:
-          "[전사 공유]\n- 우천 예보: 외부 실링 작업 일정 조정 필요\n- 원베일리 3층 자재 입고 지연 → 시공1팀 4층 선행\n- 안전관리 점검 매주 월요일 오전 9시",
-      },
-      {
-        date: new Date("2026-07-10T00:00:00"),
-        content: "[7/10] 방배 현장 크레인 반입 완료 · 시공2팀 오후 투입",
-      },
-    ],
+  // 공용 메모장 (전사 공유 단일 보드)
+  const memoDate = new Date();
+  memoDate.setHours(0, 0, 0, 0);
+  await prisma.memo.create({
+    data: {
+      date: memoDate,
+      content:
+        "[전사 공유]\n- 우천 예보: 외부 실링 작업 일정 조정 필요\n- 원베일리 3층 자재 입고 지연 → 시공1팀 4층 선행\n- 안전관리 점검 매주 월요일 오전 9시",
+    },
   });
 
   // 창호 견적 산출 데모 공사 (기준값은 화면의 '기본 기준값 채우기'로 불러오세요)

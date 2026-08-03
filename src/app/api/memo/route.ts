@@ -4,31 +4,32 @@ import { dayStart, ymd } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
-/** 요청의 date 파라미터(없으면 오늘) → 로컬 자정 Date */
-function targetDate(v: unknown): Date {
-  return dayStart(v) ?? dayStart(ymd(new Date()))!;
+/**
+ * 공용 메모장 = 전사 공유 단일 보드.
+ * (Memo.date 컬럼은 과거 날짜별 메모 구조의 잔재로 남아 있으나 사용하지 않는다.
+ *  가장 최근에 수정된 메모 1건을 공용 보드로 사용해 기존 내용을 그대로 승계.)
+ */
+async function getBoard() {
+  const memo = await prisma.memo.findFirst({ orderBy: { updatedAt: "desc" } });
+  if (memo) return memo;
+  return prisma.memo.create({
+    data: { date: dayStart(ymd(new Date()))!, content: "" },
+  });
 }
 
-// 특정 날짜(기본: 오늘)의 공용 메모 조회
-export async function GET(req: NextRequest) {
-  const date = targetDate(req.nextUrl.searchParams.get("date"));
-  const memo = await prisma.memo.findUnique({ where: { date } });
-  return NextResponse.json(
-    memo ?? { id: null, date, content: "", updatedBy: null, updatedAt: null }
-  );
+export async function GET() {
+  return NextResponse.json(await getBoard());
 }
 
-// 해당 날짜의 메모 저장 (없으면 생성)
 export async function PUT(req: NextRequest) {
   const body = await req.json();
-  const date = targetDate(body.date);
-  const content = typeof body.content === "string" ? body.content : "";
-  const updatedBy = body.updatedBy?.trim() || null;
-
-  const memo = await prisma.memo.upsert({
-    where: { date },
-    create: { date, content, updatedBy },
-    update: { content, updatedBy },
+  const board = await getBoard();
+  const memo = await prisma.memo.update({
+    where: { id: board.id },
+    data: {
+      content: typeof body.content === "string" ? body.content : "",
+      updatedBy: body.updatedBy?.trim() || null,
+    },
   });
   return NextResponse.json(memo);
 }
