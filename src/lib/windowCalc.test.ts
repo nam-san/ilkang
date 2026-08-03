@@ -6,6 +6,7 @@ import {
   lineTotalWeight,
   recommendWindowType,
   lineAmount,
+  componentWeightByUnit,
   roundUp100,
   totalMaterialCost,
   installCost,
@@ -50,10 +51,36 @@ describe("부재 물량 계산 (3-2) — 엑셀 R23 대사", () => {
   });
 });
 
+describe("부재 중량 - 단위 방식별 (SSD 포함)", () => {
+  it("M(치수기반): (W×개수W + H×개수H)/1000 × 단위중량", () => {
+    const r = componentWeightByUnit({
+      unit: "M", unitWeight: 1.106, widthMm: 1010, countW: 3, heightMm: 1150, countH: 2,
+    });
+    expect(r.lengthM).toBeCloseTo(5.33, 5);
+    expect(r.weightKg).toBeCloseTo(5.89498, 5);
+  });
+  it("EA(투입갯수): 수량 × 단위중량(kg/EA)", () => {
+    const r = componentWeightByUnit({ unit: "EA", unitWeight: 35, qty: 4 });
+    expect(r.lengthM).toBe(0);
+    expect(r.weightKg).toBe(140);
+  });
+  it("MT(중량): 수량 × 1000kg (단위중량 미지정 시 기본)", () => {
+    expect(componentWeightByUnit({ unit: "MT", unitWeight: 0, qty: 1.5 }).weightKg).toBe(1500);
+  });
+});
+
 describe("창호유형 자동추천 (3-5-2)", () => {
   const types = ["갤러리창", "T5 미서기창", "FIX+PJ창 (T5)", "T24 미서기 이중창"];
   it("이름 직접 포함 우선", () => {
-    expect(recommendWindowType("AGW / 갤러리창", types)).toBe("갤러리창");
+    expect(recommendWindowType("갤러리창 / DA", types)).toBe("갤러리창");
+  });
+  it("AGW → AW+AG 복합 유형 우선 매칭", () => {
+    const t = [...types, "AGW (AW+AG)"];
+    expect(recommendWindowType("AGW12x15 / EV기계실 / 미서기창 및 그릴창", t)).toBe("AGW (AW+AG)");
+  });
+  it("SSD 품명 → SSD 유형 매칭", () => {
+    const t = [...types, "SSD (스틸도어)"];
+    expect(recommendWindowType("SSD 방화문 W900", t)).toBe("SSD (스틸도어)");
   });
   it("키워드 '고정창'+'PJ' → FIX+PJ 유형", () => {
     expect(recommendWindowType("AW / 고정창 및 PJ창", types)).toBe("FIX+PJ창 (T5)");

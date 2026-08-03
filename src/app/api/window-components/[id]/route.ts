@@ -8,14 +8,18 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   const b = await req.json();
+  const data: Record<string, unknown> = {};
+  if ("name" in b) data.name = b.name?.trim();
+  if ("groupName" in b) data.groupName = b.groupName?.trim() || null;
+  if ("unit" in b && ["M", "EA", "MT"].includes(b.unit)) data.unit = b.unit;
+  if ("unitWeight" in b) data.unitWeight = Number(b.unitWeight) || 0;
+  if ("unitQty" in b) data.unitQty = Number(b.unitQty) || 0;
+  if ("defaultCountW" in b) data.defaultCountW = Number(b.defaultCountW) || 0;
+  if ("defaultCountH" in b) data.defaultCountH = Number(b.defaultCountH) || 0;
+
   const comp = await prisma.windowComponent.update({
     where: { id: Number(params.id) },
-    data: {
-      name: b.name?.trim(),
-      unitWeight: Number(b.unitWeight) || 0,
-      defaultCountW: Number(b.defaultCountW) || 0,
-      defaultCountH: Number(b.defaultCountH) || 0,
-    },
+    data,
   });
   return NextResponse.json(comp);
 }

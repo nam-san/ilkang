@@ -37,6 +37,32 @@ export default function CostsTab({ project }: { project: Project }) {
   const [view, setView] = useState<"cost" | "quote">("cost");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  // 경비 단가 비율 (% 단위 입력 → 저장은 소수 비율)
+  const [ratioPct, setRatioPct] = useState(
+    project.costParam?.expenseRatio ? String(project.costParam.expenseRatio * 100) : ""
+  );
+  const [applying, setApplying] = useState(false);
+
+  const applyExpense = async () => {
+    const pct = Number(ratioPct);
+    if (!isFinite(pct) || pct < 0) {
+      setMsg("비율을 올바르게 입력하세요.");
+      setTimeout(() => setMsg(""), 2500);
+      return;
+    }
+    if (!confirm(`모든 라인의 경비단가를 노무비단가의 ${pct}%로 설정합니다. 진행할까요?`)) return;
+    setApplying(true);
+    const r = await fetch(`/api/estimate-projects/${project.id}/apply-expense`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ratio: pct / 100 }),
+    });
+    const d = await r.json();
+    setApplying(false);
+    setMsg(r.ok ? `✅ ${d.applied}개 라인 경비단가 적용 (노무비 × ${pct}%)` : d.error || "적용 실패");
+    setTimeout(() => setMsg(""), 3500);
+    load();
+  };
 
   const barKeys = useMemo(() => {
     try {
@@ -130,6 +156,25 @@ export default function CostsTab({ project }: { project: Project }) {
         >
           <Download className="w-4 h-4" /> 엑셀 다운로드
         </a>
+
+        {/* 경비 단가 비율: 노무비단가 × 비율 → 경비단가 일괄 적용 */}
+        <div className="flex items-center gap-1.5 border-l border-slate-200 pl-3">
+          <label className="text-xs font-semibold text-slate-600 whitespace-nowrap">경비 단가 비율</label>
+          <input
+            type="number"
+            step="0.1"
+            min="0"
+            className="input w-20 py-1.5 text-right"
+            placeholder="0"
+            value={ratioPct}
+            onChange={(e) => setRatioPct(e.target.value)}
+            title="노무비단가 대비 경비 비율(%)"
+          />
+          <span className="text-xs text-slate-500">%</span>
+          <button className="btn-primary py-1.5" onClick={applyExpense} disabled={applying}>
+            {applying ? "적용중…" : "적용"}
+          </button>
+        </div>
         <p className="text-sm text-slate-500">
           총자재비=ROUNDUP(kg당자재비×총중량+흰지+방충망,-2) · 시공비=ROUNDUP(총중량×kg당시공비,-2). 계산값이 재료비/노무비 단가로 자동 연동됩니다.
         </p>

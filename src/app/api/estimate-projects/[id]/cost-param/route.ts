@@ -17,6 +17,7 @@ export async function PUT(
     hingeCost: Number(b.hingeCost) || 0,
     screenCost: Number(b.screenCost) || 0,
     pjInstallCost: Number(b.pjInstallCost) || 0,
+    ...(b.expenseRatio != null ? { expenseRatio: Number(b.expenseRatio) || 0 } : {}),
   };
   const cp = await prisma.costParam.upsert({
     where: { projectId },

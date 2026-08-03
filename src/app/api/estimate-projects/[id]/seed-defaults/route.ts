@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { DEFAULT_WINDOW_TYPES, DEFAULT_COST_PARAM } from "@/lib/windowDefaults";
+import { DEFAULT_WINDOW_TYPES, DEFAULT_SSD_TYPES, DEFAULT_COST_PARAM } from "@/lib/windowDefaults";
 
 export const dynamic = "force-dynamic";
 
@@ -18,20 +18,25 @@ export async function POST(
   });
   const existingNames = new Set(existing.map((t) => t.name));
 
+  const ALL = [...DEFAULT_WINDOW_TYPES, ...DEFAULT_SSD_TYPES];
   let added = 0;
-  for (let i = 0; i < DEFAULT_WINDOW_TYPES.length; i++) {
-    const t = DEFAULT_WINDOW_TYPES[i];
+  for (let i = 0; i < ALL.length; i++) {
+    const t = ALL[i];
     if (existingNames.has(t.name)) continue;
     added++;
     await prisma.windowType.create({
       data: {
         projectId,
         name: t.name,
+        category: t.category ?? "창호",
         sortOrder: i,
         components: {
           create: t.components.map((c, idx) => ({
             name: c.name,
+            groupName: c.groupName ?? null,
+            unit: c.unit ?? "M",
             unitWeight: c.unitWeight,
+            unitQty: c.unitQty ?? 0,
             defaultCountW: c.defaultCountW,
             defaultCountH: c.defaultCountH,
             sortOrder: idx,
@@ -57,5 +62,5 @@ export async function POST(
     },
   });
 
-  return NextResponse.json({ ok: true, added, skipped: DEFAULT_WINDOW_TYPES.length - added });
+  return NextResponse.json({ ok: true, added, skipped: ALL.length - added });
 }

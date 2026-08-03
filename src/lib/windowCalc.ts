@@ -52,6 +52,35 @@ export function lineTotalWeight(weights: number[]): number {
 }
 
 /**
+ * 부재 중량 계산 (단위 방식별)
+ * - "M"  : 치수 기반 → (W×개수W + H×개수H)/1000 × 단위중량(kg/M)
+ * - "EA" : 투입갯수 × 단위중량(kg/EA)
+ * - "MT" : 투입 MT × 단위중량(kg/MT, 기본 1000)
+ */
+export function componentWeightByUnit(c: {
+  unit: string;
+  unitWeight: number;
+  qty?: number;
+  widthMm?: number;
+  countW?: number;
+  heightMm?: number;
+  countH?: number;
+}): { lengthM: number; weightKg: number } {
+  if (c.unit === "EA" || c.unit === "MT") {
+    const qty = c.qty ?? 0;
+    const uw = c.unitWeight || (c.unit === "MT" ? 1000 : 0);
+    return { lengthM: 0, weightKg: qty * uw };
+  }
+  const lengthM = componentLengthM(
+    c.widthMm ?? 0,
+    c.countW ?? 0,
+    c.heightMm ?? 0,
+    c.countH ?? 0
+  );
+  return { lengthM, weightKg: componentWeightKg(lengthM, c.unitWeight) };
+}
+
+/**
  * 3-5-2. 창호유형 자동 추천 (품명/규격/비고 키워드 기반, 수정 가능)
  * typeNames 중 라인 텍스트에 가장 잘 맞는 유형명을 반환. 없으면 null.
  */
@@ -60,13 +89,27 @@ export function recommendWindowType(
   typeNames: string[]
 ): string | null {
   const hay = (text || "").replace(/\s/g, "");
-  // 유형명이 텍스트에 직접 포함되면 우선 (긴 이름 우선 매칭)
+  const upper = hay.toUpperCase();
+
+  // ① SSD 품목 → SSD 유형 우선 매칭
+  if (/SSD/i.test(upper)) {
+    const ssd = typeNames.find((t) => /SSD/i.test(t));
+    if (ssd) return ssd;
+  }
+
+  // ② AGW = AW+AG 복합 유형 (AG/AW 단독 매칭보다 우선)
+  if (/AGW/i.test(upper)) {
+    const agw = typeNames.find((t) => /AGW/i.test(t));
+    if (agw) return agw;
+  }
+
+  // ③ 유형명이 텍스트에 직접 포함되면 사용 (긴 이름 우선)
   const byName = [...typeNames]
     .sort((a, b) => b.length - a.length)
     .find((t) => hay.includes(t.replace(/\s/g, "")));
   if (byName) return byName;
 
-  // 키워드 힌트 매핑
+  // ④ 키워드 힌트 매핑
   const hints: { kw: RegExp; match: (t: string) => boolean }[] = [
     { kw: /FIX|고정창.*PJ|PJ.*고정창/i, match: (t) => /FIX|PJ/i.test(t) },
     { kw: /미서기|미세기/, match: (t) => t.includes("미서기") },

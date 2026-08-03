@@ -1,8 +1,7 @@
 // 창호 견적 - 서버측 DB 계산 오케스트레이션 (계산은 windowCalc의 순수함수 사용)
 import { prisma } from "@/lib/prisma";
 import {
-  componentLengthM,
-  componentWeightKg,
+  componentWeightByUnit,
   totalMaterialCost,
   installCost,
   totalLaborCost,
@@ -25,18 +24,31 @@ export async function generateLineComponents(lineId: number, force = false) {
   const w = line.widthMm ?? 0;
   const h = line.heightMm ?? 0;
   const data = line.windowType.components.map((c, idx) => {
-    const lengthM = componentLengthM(w, c.defaultCountW, h, c.defaultCountH);
+    const unit = c.unit || "M";
+    const qty = unit === "M" ? 0 : c.unitQty;
+    const { lengthM, weightKg } = componentWeightByUnit({
+      unit,
+      unitWeight: c.unitWeight,
+      qty,
+      widthMm: w,
+      countW: c.defaultCountW,
+      heightMm: h,
+      countH: c.defaultCountH,
+    });
     return {
       estimateLineId: lineId,
       windowComponentId: c.id,
       compName: c.name,
+      groupName: c.groupName,
+      unit,
       unitWeight: c.unitWeight,
+      qty,
       widthMm: w,
       countW: c.defaultCountW,
       heightMm: h,
       countH: c.defaultCountH,
       lengthM,
-      weightKg: componentWeightKg(lengthM, c.unitWeight),
+      weightKg,
       sortOrder: idx,
     };
   });

@@ -14,6 +14,7 @@ export async function POST(req: NextRequest) {
     data: {
       projectId: Number(b.projectId),
       name: b.name.trim(),
+      category: b.category === "SSD" ? "SSD" : "창호",
       sortOrder: count,
     },
   });

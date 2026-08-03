@@ -12,13 +12,17 @@ import CostsTab from "./CostsTab";
 export type WindowComponentT = {
   id: number;
   name: string;
+  groupName: string | null;
+  unit: string;
   unitWeight: number;
+  unitQty: number;
   defaultCountW: number;
   defaultCountH: number;
 };
 export type WindowTypeT = {
   id: number;
   name: string;
+  category: string; // "창호" | "SSD"
   sortOrder: number;
   active: boolean;
   components: WindowComponentT[];
@@ -34,6 +38,7 @@ export type Project = {
     hingeCost: number;
     screenCost: number;
     pjInstallCost: number;
+    expenseRatio: number;
   } | null;
   windowTypes: WindowTypeT[];
   _count: { lines: number };

@@ -27,10 +27,12 @@ model EstimateProject {
 }
 
 /// 창호유형 (프로젝트별) - 예: 갤러리창, T5 미서기창, FIX+PJ창
+/// category: "창호"(치수 기반) | "SSD"(투입갯수/MT 기반)
 model WindowType {
   id         Int               @id @default(autoincrement())
   projectId  Int
   name       String
+  category   String            @default("창호")
   sortOrder  Int               @default(0)
   active     Boolean           @default(true)
   project    EstimateProject   @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -43,9 +45,12 @@ model WindowComponent {
   id             Int             @id @default(autoincrement())
   windowTypeId   Int
   name           String // 후레임 / 상살,하살 / 손잡이,고리개 / 고정창 / PJ창 ...
-  unitWeight     Float           @default(0) // 단위중량 kg/M
-  defaultCountW  Int             @default(0) // 기본 폭 개수
-  defaultCountH  Int             @default(0) // 기본 높이 개수
+  groupName      String? // 부재 묶음 (AGW: AW / AG)
+  unit           String          @default("M") // "M"=치수기반 / "EA"=투입갯수 / "MT"=중량(톤)
+  unitWeight     Float           @default(0) // 단위중량 (M: kg/M, EA: kg/EA, MT: kg/MT)
+  unitQty        Float           @default(0) // SSD 기준 투입갯수 또는 MT
+  defaultCountW  Float           @default(0) // 기본 폭 개수
+  defaultCountH  Float           @default(0) // 기본 높이 개수
   sortOrder      Int             @default(0)
   windowType     WindowType      @relation(fields: [windowTypeId], references: [id], onDelete: Cascade)
   lineComponents LineComponent[]
@@ -60,6 +65,7 @@ model CostParam {
   hingeCost     Float           @default(0) // 흰지비
   screenCost    Float           @default(0) // 롤방충망비
   pjInstallCost Float           @default(0) // PJ 시공비
+  expenseRatio  Float           @default(0) // 경비 단가 비율 (노무비 × 비율 → 경비단가)
   project       EstimateProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
@@ -101,20 +107,23 @@ model EstimateLine {
 
 /// 라인×부재 물량 (자동채움 + 수동조정)
 model LineComponent {
-  id                Int             @id @default(autoincrement())
+  id                Int              @id @default(autoincrement())
   estimateLineId    Int
-  windowComponentId Int
+  windowComponentId Int? // 수동 추가 부재는 null
   compName          String // 부재명 스냅샷
-  unitWeight        Float           @default(0) // 단위중량 스냅샷
-  widthMm           Int             @default(0)
-  countW            Int             @default(0)
-  heightMm          Int             @default(0)
-  countH            Int             @default(0)
-  lengthM           Float           @default(0) // 계산된 길이
-  weightKg          Float           @default(0) // 계산된 중량
-  sortOrder         Int             @default(0)
-  estimateLine      EstimateLine    @relation(fields: [estimateLineId], references: [id], onDelete: Cascade)
-  windowComponent   WindowComponent @relation(fields: [windowComponentId], references: [id], onDelete: Cascade)
+  groupName         String? // AGW 처럼 여러 세트가 붙는 경우 구분 (예: AW / AG)
+  unit              String           @default("M") // M=치수기반 / EA / MT
+  unitWeight        Float            @default(0) // 단위중량 스냅샷
+  qty               Float            @default(0) // EA·MT 방식 수량
+  widthMm           Float            @default(0)
+  countW            Float            @default(0)
+  heightMm          Float            @default(0)
+  countH            Float            @default(0)
+  lengthM           Float            @default(0) // 계산된 길이
+  weightKg          Float            @default(0) // 계산된 중량
+  sortOrder         Int              @default(0)
+  estimateLine      EstimateLine     @relation(fields: [estimateLineId], references: [id], onDelete: Cascade)
+  windowComponent   WindowComponent? @relation(fields: [windowComponentId], references: [id], onDelete: Cascade)
 }
 
 /// 수주내역 (Contracts)
