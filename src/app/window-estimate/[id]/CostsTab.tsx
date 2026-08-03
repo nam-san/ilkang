@@ -58,10 +58,13 @@ export default function CostsTab({ project }: { project: Project }) {
       body: JSON.stringify({ ratio: pct / 100 }),
     });
     const d = await r.json();
+    if (r.ok) {
+      await load(); // 목록 갱신을 기다린 뒤 결과 표시
+      setView("quote"); // 경비단가가 보이는 견적 금액 화면으로 전환
+    }
     setApplying(false);
     setMsg(r.ok ? `✅ ${d.applied}개 라인 경비단가 적용 (노무비 × ${pct}%)` : d.error || "적용 실패");
     setTimeout(() => setMsg(""), 3500);
-    load();
   };
 
   const barKeys = useMemo(() => {
@@ -202,7 +205,13 @@ export default function CostsTab({ project }: { project: Project }) {
                 <tr><td className="td text-center text-slate-400 py-8" colSpan={9}>총중량이 산출된 라인이 없습니다. 먼저 &lsquo;자재 산출&rsquo;을 완료하세요.</td></tr>
               )}
               {lines.filter((l) => !l.isGroup && l.totalWeight != null).map((l) => (
-                <CostRow key={l.id} line={l} barKeys={barKeys} onPatch={patch} />
+                // key에 값들을 포함 → 계산/적용 후 입력칸이 즉시 갱신됨
+                <CostRow
+                  key={`${l.id}:${l.hingeCost}:${l.screenCost}:${l.pjInstallCost}:${l.barType ?? ""}`}
+                  line={l}
+                  barKeys={barKeys}
+                  onPatch={patch}
+                />
               ))}
             </tbody>
           </table>
@@ -236,7 +245,12 @@ export default function CostsTab({ project }: { project: Project }) {
                     <td className="td text-right font-bold text-blue-800">{won(subtotal!.sum)}</td>
                   </tr>
                 ) : (
-                  <QuoteRow key={line.id} line={line} onPatch={patch} />
+                  // key에 단가를 포함 → 경비비율 적용·재계산 후 입력칸이 즉시 갱신됨
+                  <QuoteRow
+                    key={`${line.id}:${line.matUnitPrice}:${line.laborUnitPrice}:${line.expenseUnitPrice}`}
+                    line={line}
+                    onPatch={patch}
+                  />
                 )
               )}
             </tbody>
