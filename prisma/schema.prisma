@@ -126,6 +126,128 @@ model LineComponent {
   windowComponent   WindowComponent? @relation(fields: [windowComponentId], references: [id], onDelete: Cascade)
 }
 
+/// 시트 면적 산출 (현장·공사위치별 이력)
+/// 면적(㎡) = (가로+가로후렌지+가로날개) × (세로+세로후렌지+세로날개) × 개수 / 1,000,000
+model SheetAreaItem {
+  id           Int      @id @default(autoincrement())
+  contractId   Int // 현장 (준공 전 현장 대상)
+  location     String // 공사 위치 (지하주차장 / 부속동 ...)
+  itemName     String? // 세부 항목명·비고
+  width        Float    @default(0) // 가로(mm)
+  widthFlange  Float    @default(0) // 가로후렌지(mm)
+  widthWing    Float    @default(0) // 가로날개(mm)
+  height       Float    @default(0) // 세로(mm)
+  heightFlange Float    @default(0) // 세로후렌지(mm)
+  heightWing   Float    @default(0) // 세로날개(mm)
+  qty          Float    @default(1) // 개수
+  area         Float    @default(0) // 산출 면적(㎡)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  contract     Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+}
+
+/// 원판 기준값 마스터 (사용자 추가·수정 가능)
+model PlateSpec {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique // 원판명 (예: 1*3)
+  width     Float // 가로(mm)
+  height    Float // 세로(mm)
+  sortOrder Int      @default(0)
+  active    Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+}
+
+/// 원판 절단 계산 히스토리
+model PlateCutHistory {
+  id          Int      @id @default(autoincrement())
+  title       String?
+  totalPlates Int
+  totalPieces Int
+  lossRate    Float
+  demands     String // 입력 원본 JSON [{width, height, qty, plateName}]
+  results     String // 계산 결과 JSON
+  createdAt   DateTime @default(now())
+}
+
+/// 파이프 절단 계산 히스토리
+model PipeCutHistory {
+  id          Int      @id @default(autoincrement())
+  title       String? // 메모·제목 (옵션)
+  stockLength Float // 원자재 길이(mm)
+  kerf        Float // 날두께(mm)
+  totalBars   Int // 총 사용 본수
+  totalCuts   Int // 총 절단 개수
+  lossRate    Float // 손실률 %
+  demands     String // 입력 원본 JSON [{length, qty}]
+  patterns    String // 계산 결과 JSON [{index, groups, remainder, ...}]
+  createdAt   DateTime @default(now())
+}
+
+// ── 캐노피 면적·금액 산출 ─────────────────────────────
+/// 시트 단가 마스터 (원/㎡) — 코드 수정 없이 갱신 가능
+model CanopySheetPrice {
+  id            Int      @id @default(autoincrement())
+  sheetType     String // AL P/N 2.0T ...
+  coating       String // 2코팅 / 3코팅
+  unitPrice     Float
+  sortOrder     Int      @default(0)
+  effectiveFrom DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  updatedBy     String?
+
+  @@unique([sheetType, coating])
+}
+
+/// 각파이프 단가 마스터 (원/본, 6m 기준) — unitPrice null = 미취급 조합
+model CanopyPipePrice {
+  id            Int      @id @default(autoincrement())
+  spec          String // 40*40 칼라 ...
+  thickness     String // 1.4T / 2T / 2.9T / 4T / 4.2T / 5.7T
+  unitPrice     Float?
+  sortOrder     Int      @default(0)
+  effectiveFrom DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  updatedBy     String?
+
+  @@unique([spec, thickness])
+}
+
+/// 캐노피 산출서 (현장별 이력)
+model CanopyEstimate {
+  id         Int                  @id @default(autoincrement())
+  contractId Int
+  name       String // 산출서 이름 (예: 지하주차장 캐노피)
+  note       String?
+  createdBy  String?
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+  contract   Contract             @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  items      CanopyEstimateItem[]
+}
+
+/// 캐노피 산출 항목 (계산값·적용단가 스냅샷 저장 → 단가 변동 후에도 과거 견적 재현)
+model CanopyEstimateItem {
+  id             Int            @id @default(autoincrement())
+  estimateId     Int
+  seq            Int            @default(0)
+  w              Float          @default(0)
+  h              Float          @default(0)
+  l              Float          @default(0)
+  sheetType      String?
+  coating        String?
+  pipeSpec       String?
+  pipeThickness  String?
+  areaM2         Float          @default(0)
+  pipeQty        Int            @default(0)
+  sheetUnitPrice Float? // 적용 단가 스냅샷
+  pipeUnitPrice  Float?
+  sheetAmount    Float?
+  pipeAmount     Float?
+  totalAmount    Float?
+  unsupported    Boolean        @default(false)
+  estimate       CanopyEstimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+}
+
 /// 수주내역 (Contracts)
 model Contract {
   id             Int               @id @default(autoincrement())
@@ -138,6 +260,8 @@ model Contract {
   warrantyPeriod String? // 하자보수기간
   createdAt      DateTime          @default(now())
   assignments    DailyAssignment[]
+  sheetAreas     SheetAreaItem[]
+  canopyEstimates CanopyEstimate[]
   logs           DailyLog[]
 }
 

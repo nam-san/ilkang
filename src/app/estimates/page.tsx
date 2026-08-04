@@ -231,7 +231,7 @@ export default function EstimatesPage() {
         </section>
 
         {/* ── 오른쪽: 건설사별 입찰 현황 ── */}
-        <aside className="card overflow-hidden lg:sticky lg:top-16">
+        <aside className="card overflow-hidden lg:sticky lg:top-[104px]">
           <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200">
             <h2 className="font-bold text-sm text-slate-700 flex items-center gap-1.5">
               <BarChart3 className="w-4 h-4 text-blue-600" /> 건설사별 입찰 현황

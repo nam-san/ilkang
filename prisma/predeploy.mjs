@@ -98,6 +98,8 @@ async function consolidateMemo() {
   return `Memo: ${rows.length}건 → 단일 보드로 통합 (내용 보존 ${filled.length}건, ${removed}건 정리)`;
 }
 
+// 기준값(마스터) 시딩은 신규 테이블 생성 이후여야 하므로 prisma/postdeploy.mjs 에서 수행한다.
+
 async function main() {
   console.log("[predeploy] 데이터 승계 마이그레이션 시작");
   console.log("[predeploy]", await migrateTodoDates());

@@ -23,6 +23,7 @@ RUN npx prisma generate && npm run build
 ENV NODE_ENV=production
 EXPOSE 3000
 
-# 시작 순서: ① 데이터 승계 마이그레이션 → ② 스키마 동기화 → ③ 서버 기동
+# 시작 순서: ① 데이터 승계 마이그레이션 → ② 스키마 동기화 → ③ 기준값 시딩 → ④ 서버 기동
 # (①이 실패하면 배포가 중단되어 기존 버전이 계속 서비스됨 = 데이터 보호)
-CMD ["sh", "-c", "node prisma/predeploy.mjs && npx prisma db push --skip-generate --accept-data-loss && npx next start -H 0.0.0.0 -p ${PORT:-3000}"]
+# (③은 ②로 생성된 신규 테이블에 기본값을 넣으므로 반드시 ② 이후. 실패해도 기동은 계속)
+CMD ["sh", "-c", "node prisma/predeploy.mjs && npx prisma db push --skip-generate --accept-data-loss && { node prisma/postdeploy.mjs || echo '[postdeploy] 실패 — 기준값은 관리화면에서 등록하세요'; } && npx next start -H 0.0.0.0 -p ${PORT:-3000}"]
